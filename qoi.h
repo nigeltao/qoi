@@ -222,17 +222,17 @@ void *qoi_decode(const void *data, int size, int *out_w, int *out_h, int channel
 	#define QOI_FREE(p)    free(p)
 #endif
 
-#define QOI_INDEX   0x00 // 00xxxxxx
-#define QOI_RUN_8   0x40 // 010xxxxx
-#define QOI_RUN_16  0x60 // 011xxxxx
-#define QOI_DIFF_8  0x80 // 10xxxxxx
-#define QOI_DIFF_16 0xc0 // 110xxxxx
-#define QOI_DIFF_24 0xe0 // 1110xxxx
-#define QOI_COLOR   0xf0 // 1111xxxx
+#define QOIBE_INDEX   0x00 // 00xxxxxx
+#define QOIBE_RUN_8   0x40 // 010xxxxx
+#define QOIBE_RUN_16  0x60 // 011xxxxx
+#define QOIBE_DIFF_8  0x80 // 10xxxxxx
+#define QOIBE_DIFF_16 0xc0 // 110xxxxx
+#define QOIBE_DIFF_24 0xe0 // 1110xxxx
+#define QOIBE_COLOR   0xf0 // 1111xxxx
 
-#define QOI_MASK_2  0xc0 // 11000000
-#define QOI_MASK_3  0xe0 // 11100000
-#define QOI_MASK_4  0xf0 // 11110000
+#define QOIBE_MASK_2  0xc0 // 11000000
+#define QOIBE_MASK_3  0xe0 // 11100000
+#define QOIBE_MASK_4  0xf0 // 11110000
 
 #define QOI_COLOR_HASH(C) (C.rgba.r ^ C.rgba.g ^ C.rgba.b ^ C.rgba.a)
 #define QOI_MAGIC \
@@ -317,11 +317,11 @@ void *qoi_encode(const void *data, int w, int h, int channels, int *out_len) {
 		if (run > 0 && (run == 0x2020 || px.v != px_prev.v || px_pos == px_end)) {
 			if (run < 33) {
 				run -= 1;
-				bytes[p++] = QOI_RUN_8 | run;
+				bytes[p++] = QOIBE_RUN_8 | run;
 			}
 			else {
 				run -= 33;
-				bytes[p++] = QOI_RUN_16 | run >> 8;
+				bytes[p++] = QOIBE_RUN_16 | run >> 8;
 				bytes[p++] = run;
 			}
 			run = 0;
@@ -331,7 +331,7 @@ void *qoi_encode(const void *data, int w, int h, int channels, int *out_len) {
 			int index_pos = QOI_COLOR_HASH(px) % 64;
 
 			if (index[index_pos].v == px.v) {
-				bytes[p++] = QOI_INDEX | index_pos;
+				bytes[p++] = QOIBE_INDEX | index_pos;
 			}
 			else {
 				index[index_pos] = px;
@@ -349,23 +349,23 @@ void *qoi_encode(const void *data, int w, int h, int channels, int *out_len) {
 						va == 0 && vr > -2 && vr < 3 &&
 						vg > -2 && vg < 3 && vb > -2 && vb < 3
 					) {
-						bytes[p++] = QOI_DIFF_8 | ((vr + 1) << 4) | (vg + 1) << 2 | (vb + 1);
+						bytes[p++] = QOIBE_DIFF_8 | ((vr + 1) << 4) | (vg + 1) << 2 | (vb + 1);
 					}
 					else if (
 						va == 0 && vr > -16 && vr < 17 && 
 						vg > -8 && vg < 9 && vb > -8 && vb < 9
 					) {
-						bytes[p++] = QOI_DIFF_16 | (vr + 15);
+						bytes[p++] = QOIBE_DIFF_16 | (vr + 15);
 						bytes[p++] = ((vg + 7) << 4) | (vb + 7);
 					}
 					else {
-						bytes[p++] = QOI_DIFF_24 | ((vr + 15) >> 1);
+						bytes[p++] = QOIBE_DIFF_24 | ((vr + 15) >> 1);
 						bytes[p++] = ((vr + 15) << 7) | ((vg + 15) << 2) | ((vb + 15) >> 3);
 						bytes[p++] = ((vb + 15) << 5) | (va + 15);
 					}
 				}
 				else {
-					bytes[p++] = QOI_COLOR | (vr?8:0)|(vg?4:0)|(vb?2:0)|(va?1:0);
+					bytes[p++] = QOIBE_COLOR | (vr?8:0)|(vg?4:0)|(vb?2:0)|(va?1:0);
 					if (vr) { bytes[p++] = px.rgba.r; }
 					if (vg) { bytes[p++] = px.rgba.g; }
 					if (vb) { bytes[p++] = px.rgba.b; }
@@ -426,28 +426,28 @@ void *qoi_decode(const void *data, int size, int *out_w, int *out_h, int channel
 		else if (p < chunks_len) {
 			int b1 = bytes[p++];
 
-			if ((b1 & QOI_MASK_2) == QOI_INDEX) {
-				px = index[b1 ^ QOI_INDEX];
+			if ((b1 & QOIBE_MASK_2) == QOIBE_INDEX) {
+				px = index[b1 ^ QOIBE_INDEX];
 			}
-			else if ((b1 & QOI_MASK_3) == QOI_RUN_8) {
+			else if ((b1 & QOIBE_MASK_3) == QOIBE_RUN_8) {
 				run = (b1 & 0x1f);
 			}
-			else if ((b1 & QOI_MASK_3) == QOI_RUN_16) {
+			else if ((b1 & QOIBE_MASK_3) == QOIBE_RUN_16) {
 				int b2 = bytes[p++];
 				run = (((b1 & 0x1f) << 8) | (b2)) + 32;
 			}
-			else if ((b1 & QOI_MASK_2) == QOI_DIFF_8) {
+			else if ((b1 & QOIBE_MASK_2) == QOIBE_DIFF_8) {
 				px.rgba.r += ((b1 >> 4) & 0x03) - 1;
 				px.rgba.g += ((b1 >> 2) & 0x03) - 1;
 				px.rgba.b += ( b1       & 0x03) - 1;
 			}
-			else if ((b1 & QOI_MASK_3) == QOI_DIFF_16) {
+			else if ((b1 & QOIBE_MASK_3) == QOIBE_DIFF_16) {
 				int b2 = bytes[p++];
 				px.rgba.r += (b1 & 0x1f) - 15;
 				px.rgba.g += (b2 >> 4) - 7;
 				px.rgba.b += (b2 & 0x0f) - 7;
 			}
-			else if ((b1 & QOI_MASK_4) == QOI_DIFF_24) {
+			else if ((b1 & QOIBE_MASK_4) == QOIBE_DIFF_24) {
 				int b2 = bytes[p++];
 				int b3 = bytes[p++];
 				px.rgba.r += (((b1 & 0x0f) << 1) | (b2 >> 7)) - 15;
@@ -455,7 +455,7 @@ void *qoi_decode(const void *data, int size, int *out_w, int *out_h, int channel
 				px.rgba.b += (((b2 & 0x03) << 3) | ((b3 & 0xe0) >> 5)) - 15;
 				px.rgba.a +=   (b3 & 0x1f) - 15;
 			}
-			else if ((b1 & QOI_MASK_4) == QOI_COLOR) {
+			else if ((b1 & QOIBE_MASK_4) == QOIBE_COLOR) {
 				if (b1 & 8) { px.rgba.r = bytes[p++]; }
 				if (b1 & 4) { px.rgba.g = bytes[p++]; }
 				if (b1 & 2) { px.rgba.b = bytes[p++]; }

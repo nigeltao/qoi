@@ -46,6 +46,9 @@ SOFTWARE.
 #define QOI_IMPLEMENTATION
 #include "qoi.h"
 
+#define QOILE_IMPLEMENTATION
+#include "qoile.h"
+
 
 
 
@@ -321,6 +324,7 @@ typedef struct {
 	benchmark_lib_result_t libpng;
 	benchmark_lib_result_t stbi;
 	benchmark_lib_result_t qoi;
+	benchmark_lib_result_t qoile;
 } benchmark_result_t;
 
 
@@ -344,6 +348,7 @@ typedef struct {
 benchmark_result_t benchmark_image(const char *path, int runs) {
 	int encoded_png_size;
 	int encoded_qoi_size;
+	int encoded_qoile_size;
 	int w;
 	int h;
 
@@ -351,8 +356,9 @@ benchmark_result_t benchmark_image(const char *path, int runs) {
 	void *pixels = (void *)stbi_load(path, &w, &h, NULL, 4);
 	void *encoded_png = fload(path, &encoded_png_size);
 	void *encoded_qoi = qoi_encode(pixels, w, h, 4, &encoded_qoi_size);
+	void *encoded_qoile = qoile_encode(pixels, w, h, 4, &encoded_qoile_size);
 
-	if (!pixels || !encoded_qoi || !encoded_png) {
+	if (!pixels || !encoded_qoi || !encoded_qoile || !encoded_png) {
 		ERROR("Error decoding %s\n", path);
 	}
 
@@ -382,6 +388,12 @@ benchmark_result_t benchmark_image(const char *path, int runs) {
 		free(dec_p);
 	});
 
+	BENCHMARK_FN(runs, res.qoile.decode_time, {
+		int dec_w, dec_h;
+		void *dec_p = qoile_decode(encoded_qoile, encoded_qoile_size, &dec_w, &dec_h, 4);
+		free(dec_p);
+	});
+
 
 	// Encoding
 
@@ -405,9 +417,17 @@ benchmark_result_t benchmark_image(const char *path, int runs) {
 		free(enc_p);
 	});
 
+	BENCHMARK_FN(runs, res.qoile.encode_time, {
+		int enc_size;
+		void *enc_p = qoi_encode(pixels, w, h, 4, &enc_size);
+		res.qoile.size = enc_size;
+		free(enc_p);
+	});
+
 	free(pixels);
 	free(encoded_png);
 	free(encoded_qoi);
+	free(encoded_qoile);
 
 	return res;
 }
@@ -439,6 +459,14 @@ void benchmark_print_result(const char *head, benchmark_result_t res) {
 		(res.qoi.decode_time > 0 ? px / ((double)res.qoi.decode_time/1000.0) : 0),
 		(res.qoi.encode_time > 0 ? px / ((double)res.qoi.encode_time/1000.0) : 0),
 		res.qoi.size/1024
+	);
+	printf(
+		"qoile:   %8.1f    %8.1f      %8.2f      %8.2f  %8d\n", 
+		(double)res.qoile.decode_time/1000000.0,
+		(double)res.qoile.encode_time/1000000.0,
+		(res.qoile.decode_time > 0 ? px / ((double)res.qoile.decode_time/1000.0) : 0),
+		(res.qoile.encode_time > 0 ? px / ((double)res.qoile.encode_time/1000.0) : 0),
+		res.qoile.size/1024
 	);
 	printf("\n");
 }
@@ -493,6 +521,9 @@ int main(int argc, char **argv) {
 		totals.qoi.encode_time += res.qoi.encode_time;
 		totals.qoi.decode_time += res.qoi.decode_time;
 		totals.qoi.size += res.qoi.size;
+		totals.qoile.encode_time += res.qoile.encode_time;
+		totals.qoile.decode_time += res.qoile.decode_time;
+		totals.qoile.size += res.qoi.size;
 	}
 	closedir(dir);
 
@@ -506,6 +537,9 @@ int main(int argc, char **argv) {
 	totals.qoi.encode_time /= count;
 	totals.qoi.decode_time /= count;
 	totals.qoi.size /= count;
+	totals.qoile.encode_time /= count;
+	totals.qoile.decode_time /= count;
+	totals.qoile.size /= count;
 
 	benchmark_print_result("Totals (AVG)", totals);
 
